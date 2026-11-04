@@ -32,19 +32,31 @@ export default function Profile() {
   const handleUpdate = async (e) => {
     e.preventDefault();
     setMessage("");
+
     try {
-      const res = await api.patch("/users/me", { name, phone, address });
+      const res = await api.patch("/users/me", {
+        name,
+        phone,
+        address,
+      });
+
       setUser(res.data);
       setMessage("Профиль успешно обновлен!");
+
       localStorage.setItem("user", JSON.stringify(res.data));
       window.location.reload();
-    } catch (err) {
+    } catch {
       setMessage("Ошибка при сохранении");
     }
   };
 
-  if (!user)
-    return <div className="text-center mt-20 text-gray-500">Загрузка...</div>;
+  if (!user) {
+    return (
+      <div className="text-center mt-20 text-gray-500">
+        Загрузка...
+      </div>
+    );
+  }
 
   return (
     <div className="max-w-2xl mx-auto mt-12 pb-12">
@@ -53,18 +65,25 @@ export default function Profile() {
           <div className="avatar-circle">
             {user.name ? user.name[0].toUpperCase() : "U"}
           </div>
+
           <div>
             <h2 className="text-2xl font-bold text-gray-900">
               {user.name || "Пользователь"}
             </h2>
-            <p className="text-gray-500">{user.email}</p>
+
+            <p className="text-gray-500">
+              {user.email}
+            </p>
+
             <span className="inline-block mt-2 bg-gray-100 text-gray-600 text-xs px-2 py-1 rounded-md font-medium uppercase">
               Роль: {user.role}
             </span>
           </div>
         </div>
 
-        <h3 className="text-lg font-bold text-gray-900 mb-4">Личные данные</h3>
+        <h3 className="text-lg font-bold text-gray-900 mb-4">
+          Личные данные
+        </h3>
 
         {message && (
           <div className="bg-green-50 text-green-700 p-3 rounded mb-4 text-sm">
@@ -79,6 +98,7 @@ export default function Profile() {
             value={name}
             onChange={(e) => setName(e.target.value)}
           />
+
           <Input
             label="Телефон"
             type="tel"
@@ -86,6 +106,7 @@ export default function Profile() {
             onChange={(e) => setPhone(e.target.value)}
             placeholder="+7 (999) 000-00-00"
           />
+
           <Textarea
             label="Адрес доставки"
             value={address}
@@ -93,6 +114,7 @@ export default function Profile() {
             rows="3"
             placeholder="Город, улица, дом, квартира"
           />
+
           <Button type="submit" variant="primary" className="mt-4">
             Сохранить изменения
           </Button>
