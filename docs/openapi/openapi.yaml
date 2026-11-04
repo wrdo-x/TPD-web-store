@@ -6,8 +6,8 @@ info:
     **Стек**: Node.js + Express + PostgreSQL + Knex.
 
 servers:
-  - url: http://localhost:4011
-    description: Локальный сервер разработки
+  - url: http://localhost:3000/api
+    description: Локальный сервер
 
 tags:
   - name: Auth
