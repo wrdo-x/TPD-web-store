@@ -1,8 +1,7 @@
 const db = require("../db/knex");
 const fs = require("fs");
-const path = require("path");
 
-// Хелпер для формирования полного URL картинки (Вариант Б)
+// Хелпер для формирования полного URL картинки
 const getFullImageUrl = (req, url) => {
   if (!url) return null;
   return `${req.protocol}://${req.get("host")}${url}`;
@@ -36,14 +35,21 @@ exports.getProducts = async (req, res) => {
       .offset(offset)
       .orderBy("products.created_at", "desc");
 
+    // Для каждого товара подтягиваем картинку и размеры
     for (let product of products) {
       const image = await db("product_images")
         .where({ product_id: product.id })
         .orderBy("sort_order", "asc")
         .first();
 
-      // Применяем хелпер для формирования полного URL
       product.image = getFullImageUrl(req, image ? image.url : null);
+
+      // Получаем размеры (ОБЯЗАТЕЛЬНО для фильтра в каталоге)
+      const sizesData = await db("product_sizes")
+        .where({ product_id: product.id })
+        .select("size"); // Убедись, что колонка называется 'size'
+
+      product.sizes = sizesData.map((s) => s.size);
     }
 
     res.json({
@@ -72,17 +78,15 @@ exports.getProductById = async (req, res) => {
       return res.status(404).json({ error: "Товар не найден" });
     }
 
-    const sizes = await db("product_sizes").where({ product_id: id });
+    const sizesData = await db("product_sizes").where({ product_id: id });
     const images = await db("product_images")
       .where({ product_id: id })
       .orderBy("sort_order", "asc");
 
     res.json({
       ...product,
-      sizes,
-      // Формируем полные URL для массива картинок
+      sizes: sizesData.map((s) => s.size),
       images: images.map((img) => getFullImageUrl(req, img.url)),
-      // Добавляем основную картинку для удобства
       image: images.length > 0 ? getFullImageUrl(req, images[0].url) : null,
     });
   } catch (err) {
@@ -96,10 +100,7 @@ exports.createProduct = async (req, res) => {
     const { name, description, price, category_id } = req.body;
 
     if (!name || !price || !category_id) {
-      // Если файл уже загружен, но валидация не прошла — удаляем его
-      if (req.file) {
-        fs.unlink(req.file.path, () => {});
-      }
+      if (req.file) fs.unlink(req.file.path, () => {});
       return res
         .status(400)
         .json({ error: "Название, цена и категория обязательны" });
@@ -114,27 +115,20 @@ exports.createProduct = async (req, res) => {
       })
       .returning("*");
 
-    // Сохраняем изображение, если оно есть
     if (req.file) {
       const imageUrl = `/uploads/products/${req.file.filename}`;
-
       await db("product_images").insert({
         product_id: newProduct.id,
         url: imageUrl,
         sort_order: 0,
       });
-
-      // Применяем хелпер для возврата полного URL
       newProduct.image = getFullImageUrl(req, imageUrl);
     }
 
     res.status(201).json(newProduct);
   } catch (err) {
     console.error(err);
-    // Удаляем файл при ошибке БД
-    if (req.file) {
-      fs.unlink(req.file.path, () => {});
-    }
+    if (req.file) fs.unlink(req.file.path, () => {});
     res.status(500).json({ error: "Ошибка при создании товара" });
   }
 };
@@ -142,17 +136,8 @@ exports.createProduct = async (req, res) => {
 exports.deleteProduct = async (req, res) => {
   try {
     const { id } = req.params;
-
-    // (Опционально) Здесь можно сначала получить список картинок из БД
-    // и удалить физические файлы с диска с помощью fs.unlink,
-    // чтобы не копить мусор. Но для начала можно оставить и так.
-
     const deleted = await db("products").where({ id }).del();
-
-    if (!deleted) {
-      return res.status(404).json({ error: "Товар не найден" });
-    }
-
+    if (!deleted) return res.status(404).json({ error: "Товар не найден" });
     res.json({ message: "Товар успешно удален" });
   } catch (err) {
     console.error(err);
