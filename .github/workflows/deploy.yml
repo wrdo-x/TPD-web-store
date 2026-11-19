@@ -30,24 +30,33 @@ jobs:
 
   # 2. CD Бэкенда: Сборка Docker-образа и пуш в GitHub Registry
   # Это докажет, что ты умеешь готовить артефакт для деплоя
+  # --- ДЖОБ 2: CD для Бэкенда (сборка и пуш Docker-образа) ---
   backend-docker:
     needs: backend-ci
     if: github.ref == 'refs/heads/main' && github.event_name == 'push'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+
+      # Хитрость: переводим имя репозитория в нижний регистр через bash
+      - name: Lowercase repository name
+        run: |
+          echo "REPO_LOWER=$(echo ${{ github.repository }} | tr '[:upper:]' '[:lower:]')" >> $GITHUB_ENV
+
       - name: Log in to GitHub Container Registry
         uses: docker/login-action@v3
         with:
           registry: ghcr.io
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
+
       - name: Build and push Docker image
         uses: docker/build-push-action@v5
         with:
           context: ./backend
           push: true
-          tags: ghcr.io/${{ toLowerCase(github.repository) }}/backend:latest
+          # Используем переменную, которую мы создали шагом выше
+          tags: ghcr.io/${{ env.REPO_LOWER }}/backend:latest
 
   # 3. CI/CD Фронтенда: Сборка и деплой на GitHub Pages
   frontend-deploy:
