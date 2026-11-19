@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import api from "../api";
 import AdminProducts from "./AdminProducts";
+import AdminProductForm from "./AdminProductForm";
 
 const navigationItems = [
   { label: "Обзор", to: "/admin", icon: "▦" },
@@ -238,19 +239,8 @@ export default function AdminPanel() {
 
             ) : pathname === "/admin/products/new" ? (
 
-              /* Раздел добавления товара */
-              <div className="rounded-xl border border-[#e9e5de] bg-white p-6 shadow-sm sm:p-8">
-                <h2
-                  id="admin-content-title"
-                  className="text-xl font-semibold text-[#292929]"
-                >
-                  Добавить товар
-                </h2>
-
-                <p className="mt-3 text-sm leading-6 text-[#858078]">
-                  Форма создания товара будет добавлена в задаче FE-011.
-                </p>
-              </div>
+              /* Форма добавления товара */
+              <AdminProductForm />
 
             ) : (
 
