@@ -54,10 +54,7 @@ export default function AdminProductForm() {
         const categoryMap = new Map();
 
         items.forEach((product) => {
-          if (
-            product.category_id != null &&
-            product.category_name
-          ) {
+          if (product.category_id != null && product.category_name) {
             categoryMap.set(String(product.category_id), {
               id: String(product.category_id),
               name: product.category_name,
@@ -65,21 +62,18 @@ export default function AdminProductForm() {
           }
         });
 
-        const loadedCategories = Array.from(
-          categoryMap.values()
-        );
+        const loadedCategories = Array.from(categoryMap.values());
 
         setCategories(loadedCategories);
 
         if (loadedCategories.length > 0) {
           setForm((current) => ({
             ...current,
-            category_id:
-              current.category_id || loadedCategories[0].id,
+            category_id: current.category_id || loadedCategories[0].id,
           }));
         } else {
           setCategoriesError(
-            "Категории не найдены. Для добавления товара необходимо наличие категорий в базе данных."
+            "Категории не найдены. Для добавления товара необходимо наличие категорий в базе данных.",
           );
         }
       } catch (requestError) {
@@ -88,7 +82,7 @@ export default function AdminProductForm() {
         setCategoriesError(
           requestError.response?.data?.error ||
             requestError.message ||
-            "Не удалось загрузить категории. Проверьте подключение к серверу."
+            "Не удалось загрузить категории. Проверьте подключение к серверу.",
         );
       } finally {
         if (!controller.signal.aborted) {
@@ -126,16 +120,10 @@ export default function AdminProductForm() {
     setError("");
     setSuccess("");
 
-    const allowedTypes = [
-      "image/jpeg",
-      "image/png",
-      "image/webp",
-    ];
+    const allowedTypes = ["image/jpeg", "image/png", "image/webp"];
 
     if (!allowedTypes.includes(file.type)) {
-      setError(
-        "Выберите изображение в формате JPG, PNG или WEBP."
-      );
+      setError("Выберите изображение в формате JPG, PNG или WEBP.");
       event.target.value = "";
       return;
     }
@@ -143,9 +131,7 @@ export default function AdminProductForm() {
     const maxSize = 1024 * 1024;
 
     if (file.size > maxSize) {
-      setError(
-        "Размер фотографии не должен превышать 1 МБ."
-      );
+      setError("Размер фотографии не должен превышать 1 МБ.");
       event.target.value = "";
       return;
     }
@@ -184,7 +170,6 @@ export default function AdminProductForm() {
     }
   };
 
-  // Отправка формы
   const handleSubmit = async (event) => {
     event.preventDefault();
 
@@ -208,30 +193,25 @@ export default function AdminProductForm() {
       return;
     }
 
-    const productData = {
-      name: form.name.trim(),
-      description: form.description.trim(),
-      price,
-      category_id: Number(form.category_id),
-    };
+    const formData = new FormData();
+    formData.append("name", form.name.trim());
+    formData.append("description", form.description.trim());
+    formData.append("price", String(price));
+    formData.append("category_id", String(Number(form.category_id)));
 
-    const hasImage = Boolean(imageFile);
+    if (imageFile) {
+      formData.append("image", imageFile);
+    }
 
     setIsSubmitting(true);
 
     try {
-      // Отправляем данные товара на Backend
-      await api.post("/products", productData);
+      // ВАЖНО: axios сам установит multipart/form-data + boundary,
+      // если НЕ указывать Content-Type вручную
+      await api.post("/products", formData);
 
-      if (hasImage) {
-        setSuccess(
-          "Товар успешно добавлен! Фотография пока не сохранена на сервере, поскольку загрузка изображений ещё не реализована на Backend."
-        );
-      } else {
-        setSuccess("Товар успешно добавлен!");
-      }
+      setSuccess("Товар успешно добавлен!");
 
-      // Очищаем форму
       setForm((current) => ({
         ...initialForm,
         category_id: current.category_id,
@@ -244,13 +224,11 @@ export default function AdminProductForm() {
       if (status === 401) {
         setError("Необходимо авторизоваться заново.");
       } else if (status === 403) {
-        setError(
-          "У вас недостаточно прав для добавления товаров."
-        );
+        setError("У вас недостаточно прав для добавления товаров.");
       } else {
         setError(
           requestError.response?.data?.error ||
-            "Не удалось добавить товар. Попробуйте ещё раз."
+            "Не удалось добавить товар. Попробуйте ещё раз.",
         );
       }
     } finally {
@@ -260,7 +238,6 @@ export default function AdminProductForm() {
 
   return (
     <div className="rounded-xl border border-[#e9e5de] bg-white p-6 shadow-sm sm:p-8">
-
       {/* Заголовок */}
       <div className="mb-8">
         <Link
@@ -281,8 +258,8 @@ export default function AdminProductForm() {
 
       {/* Информация о фотографиях */}
       <div className="mb-6 rounded-lg border border-blue-200 bg-blue-50 p-4 text-sm text-blue-800">
-        Фотографию можно выбрать и посмотреть перед добавлением.
-        Сохранение изображения на сервер пока не подключено.
+        Фотографию можно выбрать и посмотреть перед добавлением. Сохранение
+        изображения на сервер пока не подключено.
       </div>
 
       {/* Ошибка */}
@@ -304,10 +281,7 @@ export default function AdminProductForm() {
           {success}
 
           <p className="mt-3">
-            <Link
-              to={productsUrl}
-              className="font-medium underline"
-            >
+            <Link to={productsUrl} className="font-medium underline">
               Посмотреть список товаров
             </Link>
           </p>
@@ -316,7 +290,6 @@ export default function AdminProductForm() {
 
       {/* Форма */}
       <form onSubmit={handleSubmit} className="space-y-6">
-
         {/* Название */}
         <div>
           <label
@@ -369,10 +342,8 @@ export default function AdminProductForm() {
           </label>
 
           <div className="rounded-xl border border-dashed border-[#cfc5b8] bg-[#faf9f7] p-5">
-
             {imagePreview ? (
               <div className="flex flex-col items-start gap-4 sm:flex-row sm:items-center">
-
                 <img
                   src={imagePreview}
                   alt="Предпросмотр товара"
@@ -396,11 +367,9 @@ export default function AdminProductForm() {
                     Удалить фотографию
                   </button>
                 </div>
-
               </div>
             ) : (
               <div className="flex flex-col items-center py-5 text-center">
-
                 <div className="mb-3 flex h-14 w-14 items-center justify-center rounded-full bg-[#f0eae1] text-2xl text-[#8f795f]">
                   +
                 </div>
@@ -412,7 +381,6 @@ export default function AdminProductForm() {
                 <p className="mt-2 text-xs text-[#858078]">
                   JPG, PNG или WEBP. Максимальный размер — 1 МБ.
                 </p>
-
               </div>
             )}
 
@@ -424,7 +392,6 @@ export default function AdminProductForm() {
               onChange={handleImageChange}
               className="mt-4 block w-full text-sm text-[#625e57] file:mr-4 file:rounded-lg file:border-0 file:bg-[#292929] file:px-4 file:py-2.5 file:text-sm file:font-medium file:text-white hover:file:bg-[#45413c]"
             />
-
           </div>
         </div>
 
@@ -461,9 +428,7 @@ export default function AdminProductForm() {
           </label>
 
           {isLoadingCategories ? (
-            <p className="text-sm text-[#858078]">
-              Загружаем категории...
-            </p>
+            <p className="text-sm text-[#858078]">Загружаем категории...</p>
           ) : categoriesError ? (
             <p role="alert" className="text-sm text-red-600">
               {categoriesError}
@@ -482,10 +447,7 @@ export default function AdminProductForm() {
               </option>
 
               {categories.map((category) => (
-                <option
-                  key={category.id}
-                  value={category.id}
-                >
+                <option key={category.id} value={category.id}>
                   {category.name}
                 </option>
               ))}
@@ -495,19 +457,14 @@ export default function AdminProductForm() {
 
         {/* Кнопки */}
         <div className="flex flex-col gap-3 border-t border-[#eeeae4] pt-6 sm:flex-row">
-
           <button
             type="submit"
             disabled={
-              isSubmitting ||
-              isLoadingCategories ||
-              categories.length === 0
+              isSubmitting || isLoadingCategories || categories.length === 0
             }
             className="rounded-lg bg-[#292929] px-6 py-3 text-sm font-medium text-white transition hover:bg-[#45413c] disabled:cursor-not-allowed disabled:opacity-50"
           >
-            {isSubmitting
-              ? "Добавление..."
-              : "Добавить товар"}
+            {isSubmitting ? "Добавление..." : "Добавить товар"}
           </button>
 
           <Link
@@ -516,7 +473,6 @@ export default function AdminProductForm() {
           >
             Отмена
           </Link>
-
         </div>
       </form>
     </div>

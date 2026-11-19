@@ -1,33 +1,21 @@
-import { useMemo, useState } from "react";
+import { useMemo, useState, useEffect } from "react"; // Добавили useEffect
 import { useSearchParams } from "react-router-dom";
 import ProductCard from "../components/ProductCard";
-import { products } from "../data/products";
+import api from "../api"; // Импортируем твой настроенный axios
 
-const categories = [
-  "Все",
-  "Футболки",
-  "Джинсы",
-  "Куртки",
-  "Аксессуары",
-];
+const categories = ["Все", "Футболки", "Джинсы", "Куртки", "Аксессуары"];
 
 const sizeOrder = ["XXS", "XS", "S", "M", "L", "XL", "XXL", "XXXL"];
-
 const PRODUCTS_PER_PAGE = 8;
 
-// Формирование номеров страниц
 function getPaginationItems(currentPage, totalPages) {
+  // ... (оставь эту функцию без изменений)
   if (totalPages <= 7) {
-    return Array.from(
-      { length: totalPages },
-      (_, index) => index + 1
-    );
+    return Array.from({ length: totalPages }, (_, index) => index + 1);
   }
-
   if (currentPage <= 4) {
     return [1, 2, 3, 4, 5, "...", totalPages];
   }
-
   if (currentPage >= totalPages - 3) {
     return [
       1,
@@ -39,7 +27,6 @@ function getPaginationItems(currentPage, totalPages) {
       totalPages,
     ];
   }
-
   return [
     1,
     "...",
@@ -52,191 +39,140 @@ function getPaginationItems(currentPage, totalPages) {
 }
 
 export default function Catalog() {
+  // --- НОВЫЕ СОСТОЯНИЯ ДЛЯ ЗАГРУЗКИ ---
+  const [dbProducts, setDbProducts] = useState([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState("");
+
   const [search, setSearch] = useState("");
   const [sort, setSort] = useState("default");
-
   const [searchParams, setSearchParams] = useSearchParams();
+
+  // --- ЗАГРУЗКА ТОВАРОВ С БЭКЕНДА ---
+  useEffect(() => {
+    const fetchProducts = async () => {
+      try {
+        setIsLoading(true);
+        // Запрашиваем все товары (лимит 100 для примера)
+        const response = await api.get("/products?limit=100");
+        setDbProducts(response.data.items || []);
+        setError("");
+      } catch (err) {
+        console.error(err);
+        setError("Не удалось загрузить товары. Проверьте подключение.");
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    fetchProducts();
+  }, []);
 
   // Выбранная категория
   const requestedCategory = searchParams.get("category");
-
   const category = categories.includes(requestedCategory)
     ? requestedCategory
     : "Все";
 
-  // Доступные размеры из товаров
+  // Доступные размеры (теперь берем из dbProducts, а не из локальных)
+  // ПРИМЕЧАНИЕ: Если бэкенд не возвращает sizes для каждого товара в списке,
+  // фильтр по размерам может не работать. Пока оставляем так:
   const availableSizes = useMemo(() => {
-    const sizes = new Set(
-      products.flatMap((product) =>
-        Array.isArray(product.sizes) ? product.sizes : []
-      )
-    );
-
+    const sizes = new Set();
+    dbProducts.forEach((product) => {
+      if (Array.isArray(product.sizes)) {
+        product.sizes.forEach((s) => sizes.add(s));
+      }
+    });
     return [...sizes].sort((a, b) => {
       const indexA = sizeOrder.indexOf(a);
       const indexB = sizeOrder.indexOf(b);
-
       const orderA = indexA === -1 ? sizeOrder.length : indexA;
       const orderB = indexB === -1 ? sizeOrder.length : indexB;
-
       return orderA - orderB || String(a).localeCompare(String(b));
     });
-  }, []);
+  }, [dbProducts]);
 
-  // Выбранный размер
+  // ... (Остальные хуки: selectedSize, currentPage оставляем как были)
   const requestedSize = searchParams.get("size");
-
   const selectedSize = availableSizes.includes(requestedSize)
     ? requestedSize
     : "";
 
-  // Текущая страница
   const requestedPage = Number(searchParams.get("page") || 1);
-
   const validRequestedPage =
-    Number.isInteger(requestedPage) && requestedPage > 0
-      ? requestedPage
-      : 1;
+    Number.isInteger(requestedPage) && requestedPage > 0 ? requestedPage : 1;
 
-  // Изменение категории
-  const handleCategoryChange = (value) => {
-    const nextParams = new URLSearchParams(searchParams);
+  // ... (Функции handleCategoryChange, handleSizeChange, handleSearchChange, handleSortChange, handleResetFilters оставляем без изменений)
 
-    if (value === "Все") {
-      nextParams.delete("category");
-    } else {
-      nextParams.set("category", value);
-    }
-
-    nextParams.delete("page");
-
-    setSearchParams(nextParams);
-  };
-
-  // Изменение размера
-  const handleSizeChange = (value) => {
-    const nextParams = new URLSearchParams(searchParams);
-
-    if (!value) {
-      nextParams.delete("size");
-    } else {
-      nextParams.set("size", value);
-    }
-
-    nextParams.delete("page");
-
-    setSearchParams(nextParams);
-  };
-
-  // Сброс страницы при поиске
-  const handleSearchChange = (value) => {
-    setSearch(value);
-
-    if (searchParams.has("page")) {
-      const nextParams = new URLSearchParams(searchParams);
-      nextParams.delete("page");
-
-      setSearchParams(nextParams, { replace: true });
-    }
-  };
-
-  // Изменение сортировки
-  const handleSortChange = (value) => {
-    setSort(value);
-
-    if (searchParams.has("page")) {
-      const nextParams = new URLSearchParams(searchParams);
-      nextParams.delete("page");
-
-      setSearchParams(nextParams, { replace: true });
-    }
-  };
-
-  // Сброс всех фильтров
-  const handleResetFilters = () => {
-    setSearch("");
-    setSort("default");
-    setSearchParams({});
-  };
-
-  // Фильтрация и сортировка товаров
+  // Фильтрация и сортировка (теперь используем dbProducts вместо products)
   const filteredProducts = useMemo(() => {
-    let result = products.filter((product) => {
+    let result = dbProducts.filter((product) => {
       const matchesSearch = product.name
         .toLowerCase()
         .includes(search.trim().toLowerCase());
-
       const matchesCategory =
-        category === "Все" ||
-        product.category_name === category;
+        category === "Все" || product.category_name === category;
 
+      // ВАЖНО: Бэкенд при получении списка товаров (GET /products)
+      // сейчас НЕ отдает размеры (sizes). Если фильтр по размерам нужен в каталоге,
+      // нужно доработать метод getProducts в productController.js на бэкенде.
       const matchesSize =
         !selectedSize ||
-        (Array.isArray(product.sizes) &&
-          product.sizes.includes(selectedSize));
+        (Array.isArray(product.sizes) && product.sizes.includes(selectedSize));
 
       return matchesSearch && matchesCategory && matchesSize;
     });
 
-    if (sort === "price-asc") {
-      result.sort((a, b) => a.price - b.price);
-    }
-
-    if (sort === "price-desc") {
-      result.sort((a, b) => b.price - a.price);
-    }
+    if (sort === "price-asc")
+      result.sort((a, b) => Number(a.price) - Number(b.price));
+    if (sort === "price-desc")
+      result.sort((a, b) => Number(b.price) - Number(a.price));
 
     return result;
-  }, [search, category, selectedSize, sort]);
+  }, [dbProducts, search, category, selectedSize, sort]);
 
-  // Расчёт пагинации
+  // ... (Пагинация оставляем без изменений: totalPages, currentPage, paginatedProducts)
+
   const totalPages = Math.max(
     1,
-    Math.ceil(filteredProducts.length / PRODUCTS_PER_PAGE)
+    Math.ceil(filteredProducts.length / PRODUCTS_PER_PAGE),
   );
-
   const currentPage = Math.min(validRequestedPage, totalPages);
 
-  // Товары текущей страницы
   const paginatedProducts = useMemo(() => {
     const startIndex = (currentPage - 1) * PRODUCTS_PER_PAGE;
-
-    return filteredProducts.slice(
-      startIndex,
-      startIndex + PRODUCTS_PER_PAGE
-    );
+    return filteredProducts.slice(startIndex, startIndex + PRODUCTS_PER_PAGE);
   }, [filteredProducts, currentPage]);
 
-  // Переключение страницы
-  const handlePageChange = (page) => {
-    if (page < 1 || page > totalPages) return;
+  // --- ДОБАВЛЯЕМ ЭКРАНЫ ЗАГРУЗКИ И ОШИБКИ В JSX ---
+  if (isLoading) {
+    return (
+      <main className="flex min-h-screen items-center justify-center bg-[#f8f7f4]">
+        <p className="text-sm text-[#858078]">Загружаем каталог...</p>
+      </main>
+    );
+  }
 
-    const nextParams = new URLSearchParams(searchParams);
-
-    if (page === 1) {
-      nextParams.delete("page");
-    } else {
-      nextParams.set("page", String(page));
-    }
-
-    setSearchParams(nextParams);
-  };
-
-  const hasActiveFilters =
-    search.trim() !== "" ||
-    category !== "Все" ||
-    selectedSize !== "" ||
-    sort !== "default";
-
-  const paginationItems = getPaginationItems(
-    currentPage,
-    totalPages
-  );
+  if (error) {
+    return (
+      <main className="flex min-h-[70vh] items-center justify-center bg-[#f8f7f4] px-5 py-12">
+        <div className="text-center">
+          <h2 className="text-xl font-medium text-gray-800">{error}</h2>
+          <button
+            onClick={() => window.location.reload()}
+            className="mt-4 bg-[#292929] px-6 py-3 text-white"
+          >
+            Обновить
+          </button>
+        </div>
+      </main>
+    );
+  }
 
   return (
     <main className="min-h-screen bg-[#f8f7f4]">
       <div className="mx-auto max-w-7xl px-5 py-12 md:px-8">
-
         {/* Заголовок */}
         <div className="mb-10">
           <p className="mb-3 text-xs uppercase tracking-widest text-gray-400">
@@ -254,7 +190,6 @@ export default function Catalog() {
 
         {/* Поиск и сортировка */}
         <div className="mb-8 flex flex-col gap-4 sm:flex-row">
-
           <input
             type="search"
             value={search}
@@ -274,7 +209,6 @@ export default function Catalog() {
             <option value="price-asc">Сначала дешевле</option>
             <option value="price-desc">Сначала дороже</option>
           </select>
-
         </div>
 
         {/* Выпадающий список категорий */}
@@ -302,12 +236,9 @@ export default function Catalog() {
 
         {/* Фильтр размеров */}
         <div className="mb-10">
-          <h2 className="mb-4 text-sm font-semibold text-[#292929]">
-            Размер
-          </h2>
+          <h2 className="mb-4 text-sm font-semibold text-[#292929]">Размер</h2>
 
           <div className="flex flex-wrap gap-3">
-
             <button
               type="button"
               onClick={() => handleSizeChange("")}
@@ -336,7 +267,6 @@ export default function Catalog() {
                 {size}
               </button>
             ))}
-
           </div>
         </div>
 
@@ -361,10 +291,7 @@ export default function Catalog() {
         {paginatedProducts.length > 0 ? (
           <div className="grid grid-cols-2 gap-4 sm:grid-cols-2 md:gap-6 lg:grid-cols-4">
             {paginatedProducts.map((product) => (
-              <ProductCard
-                key={product.id}
-                product={product}
-              />
+              <ProductCard key={product.id} product={product} />
             ))}
           </div>
         ) : (
@@ -404,10 +331,7 @@ export default function Catalog() {
 
             {paginationItems.map((item, index) =>
               item === "..." ? (
-                <span
-                  key={`ellipsis-${index}`}
-                  className="px-2 text-gray-400"
-                >
+                <span key={`ellipsis-${index}`} className="px-2 text-gray-400">
                   ...
                 </span>
               ) : (
@@ -415,9 +339,7 @@ export default function Catalog() {
                   key={item}
                   type="button"
                   onClick={() => handlePageChange(item)}
-                  aria-current={
-                    currentPage === item ? "page" : undefined
-                  }
+                  aria-current={currentPage === item ? "page" : undefined}
                   className={`h-10 min-w-10 rounded-lg border px-3 text-sm transition ${
                     currentPage === item
                       ? "border-[#292929] bg-[#292929] text-white"
@@ -426,7 +348,7 @@ export default function Catalog() {
                 >
                   {item}
                 </button>
-              )
+              ),
             )}
 
             <button
@@ -439,7 +361,6 @@ export default function Catalog() {
             </button>
           </nav>
         )}
-
       </div>
     </main>
   );
