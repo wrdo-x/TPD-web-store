@@ -1,7 +1,7 @@
-
 import { useEffect, useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import api from "../api";
+import AdminProducts from "./AdminProducts";
 
 const navigationItems = [
   { label: "Обзор", to: "/admin", icon: "▦" },
@@ -100,25 +100,23 @@ export default function AdminPanel() {
   const [error, setError] = useState("");
   const [retryCount, setRetryCount] = useState(0);
 
+  // Проверка авторизации и прав администратора
   useEffect(() => {
     let isMounted = true;
 
     const verifyAdmin = async () => {
       const token = localStorage.getItem("token");
 
-      // Проверяем наличие токена
       if (!token) {
         navigate("/login", { replace: true });
         return;
       }
 
       try {
-        // Получаем данные авторизованного пользователя
         const response = await api.get("/users/me");
 
         if (!isMounted) return;
 
-        // Проверяем роль пользователя
         if (response.data.role !== "admin") {
           navigate("/", { replace: true });
           return;
@@ -129,7 +127,6 @@ export default function AdminPanel() {
       } catch (requestError) {
         if (!isMounted) return;
 
-        // Если токен недействителен
         if (requestError.response?.status === 401) {
           localStorage.removeItem("token");
           localStorage.removeItem("user");
@@ -237,18 +234,7 @@ export default function AdminPanel() {
 
             {/* Раздел товаров */}
             {pathname === "/admin/products" ? (
-              <div className="rounded-xl border border-[#e9e5de] bg-white p-6 shadow-sm sm:p-8">
-                <h2
-                  id="admin-content-title"
-                  className="text-xl font-semibold text-[#292929]"
-                >
-                  Товары
-                </h2>
-
-                <p className="mt-3 text-sm leading-6 text-[#858078]">
-                  Таблица товаров будет добавлена в задаче FE-010.
-                </p>
-              </div>
+              <AdminProducts />
 
             ) : pathname === "/admin/products/new" ? (
 
