@@ -27,7 +27,8 @@ export default function Login() {
       localStorage.setItem("token", res.data.token);
       localStorage.setItem("user", JSON.stringify(res.data.user));
 
-      navigate("/profile", { replace: true });
+      const destination = res.data.user.role === "admin" ? "/admin" : "/profile";
+      navigate(destination, { replace: true });
       window.location.reload();
     } catch (err) {
       setError(

@@ -13,6 +13,8 @@ export default function Header() {
     }
   })();
 
+  const isAdmin = Boolean(token && user.role === "admin");
+
   const handleLogout = async () => {
     try {
       await api.post("/auth/logout");
@@ -56,6 +58,15 @@ export default function Header() {
         <div className="flex items-center gap-5">
           {token ? (
             <>
+              {isAdmin && (
+                <Link
+                  to="/admin"
+                  className="text-xs text-[#242321] transition-colors hover:text-[#918777] sm:text-sm"
+                >
+                  Админ-панель
+                </Link>
+              )}
+
               <Link
                 to="/profile"
                 className="hidden text-sm text-[#242321] transition-colors hover:text-[#918777] sm:block"
