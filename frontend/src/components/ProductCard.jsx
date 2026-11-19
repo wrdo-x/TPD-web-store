@@ -23,7 +23,6 @@ export default function ProductCard({ product }) {
       aria-label={`Открыть товар ${product.name}`}
     >
       <article className={styles.card}>
-
         {/* Фотография или заглушка */}
         <div className={styles.imageWrapper}>
           {hasImage ? (
@@ -35,38 +34,26 @@ export default function ProductCard({ product }) {
             />
           ) : (
             <div className={styles.placeholder}>
-              <span className={styles.placeholderNumber}>
-                {productNumber}
-              </span>
+              <span className={styles.placeholderNumber}>{productNumber}</span>
 
-              <span className={styles.placeholderLabel}>
-                Фото товара
-              </span>
+              <span className={styles.placeholderLabel}>Фото товара</span>
             </div>
           )}
         </div>
 
         {/* Информация о товаре */}
         <div className={styles.body}>
-
           <span className={styles.category}>
             {product.category_name || "Одежда"}
           </span>
 
-          <h2 className={styles.title}>
-            {product.name || "Название товара"}
-          </h2>
+          <h2 className={styles.title}>{product.name || "Название товара"}</h2>
 
           <div className={styles.bottom}>
-            <p className={styles.price}>
-              {formattedPrice}
-            </p>
+            <p className={styles.price}>{formattedPrice}</p>
 
-            <span className={styles.arrow}>
-              →
-            </span>
+            <span className={styles.arrow}>→</span>
           </div>
-
         </div>
       </article>
     </Link>

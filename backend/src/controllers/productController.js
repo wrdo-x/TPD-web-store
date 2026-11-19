@@ -1,4 +1,11 @@
 const db = require("../db/knex");
+const fs = require("fs");
+
+// Хелпер для формирования полного URL картинки
+const getFullImageUrl = (req, url) => {
+  if (!url) return null;
+  return `${req.protocol}://${req.get("host")}${url}`;
+};
 
 exports.getProducts = async (req, res) => {
   try {
@@ -28,12 +35,21 @@ exports.getProducts = async (req, res) => {
       .offset(offset)
       .orderBy("products.created_at", "desc");
 
+    // Для каждого товара подтягиваем картинку и размеры
     for (let product of products) {
       const image = await db("product_images")
         .where({ product_id: product.id })
         .orderBy("sort_order", "asc")
         .first();
-      product.image = image ? image.url : null;
+
+      product.image = getFullImageUrl(req, image ? image.url : null);
+
+      // Получаем размеры (ОБЯЗАТЕЛЬНО для фильтра в каталоге)
+      const sizesData = await db("product_sizes")
+        .where({ product_id: product.id })
+        .select("size"); // Убедись, что колонка называется 'size'
+
+      product.sizes = sizesData.map((s) => s.size);
     }
 
     res.json({
@@ -62,15 +78,16 @@ exports.getProductById = async (req, res) => {
       return res.status(404).json({ error: "Товар не найден" });
     }
 
-    const sizes = await db("product_sizes").where({ product_id: id });
+    const sizesData = await db("product_sizes").where({ product_id: id });
     const images = await db("product_images")
       .where({ product_id: id })
       .orderBy("sort_order", "asc");
 
     res.json({
       ...product,
-      sizes,
-      images: images.map((img) => img.url),
+      sizes: sizesData.map((s) => s.size),
+      images: images.map((img) => getFullImageUrl(req, img.url)),
+      image: images.length > 0 ? getFullImageUrl(req, images[0].url) : null,
     });
   } catch (err) {
     console.error(err);
@@ -83,18 +100,35 @@ exports.createProduct = async (req, res) => {
     const { name, description, price, category_id } = req.body;
 
     if (!name || !price || !category_id) {
+      if (req.file) fs.unlink(req.file.path, () => {});
       return res
         .status(400)
         .json({ error: "Название, цена и категория обязательны" });
     }
 
     const [newProduct] = await db("products")
-      .insert({ name, description, price, category_id })
+      .insert({
+        name,
+        description,
+        price,
+        category_id: Number(category_id),
+      })
       .returning("*");
+
+    if (req.file) {
+      const imageUrl = `/uploads/products/${req.file.filename}`;
+      await db("product_images").insert({
+        product_id: newProduct.id,
+        url: imageUrl,
+        sort_order: 0,
+      });
+      newProduct.image = getFullImageUrl(req, imageUrl);
+    }
 
     res.status(201).json(newProduct);
   } catch (err) {
     console.error(err);
+    if (req.file) fs.unlink(req.file.path, () => {});
     res.status(500).json({ error: "Ошибка при создании товара" });
   }
 };
@@ -103,11 +137,7 @@ exports.deleteProduct = async (req, res) => {
   try {
     const { id } = req.params;
     const deleted = await db("products").where({ id }).del();
-
-    if (!deleted) {
-      return res.status(404).json({ error: "Товар не найден" });
-    }
-
+    if (!deleted) return res.status(404).json({ error: "Товар не найден" });
     res.json({ message: "Товар успешно удален" });
   } catch (err) {
     console.error(err);
