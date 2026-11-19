@@ -10,6 +10,7 @@ import Product from "./pages/Product";
 import Login from "./pages/Login";
 import Register from "./pages/Register";
 import Profile from "./pages/Profile";
+import AdminPanel from "./pages/AdminPanel";
 
 function App() {
   return (
@@ -36,6 +37,9 @@ function App() {
 
             {/* Личный кабинет */}
             <Route path="/profile" element={<Profile />} />
+
+            {/* Панель администратора */}
+            <Route path="/admin/*" element={<AdminPanel />} />
           </Routes>
         </main>
 
