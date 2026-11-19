@@ -1,17 +1,12 @@
 const bcrypt = require("bcrypt");
 
 exports.seed = async function (knex) {
-  await knex("order_items").del();
-  await knex("orders").del();
-  await knex("cart_items").del();
-  await knex("carts").del();
-  await knex("product_images").del();
-  await knex("product_sizes").del();
-  await knex("products").del();
-  await knex("categories").del();
-  await knex("password_resets").del();
-  await knex("users").del();
+  // 1. ЖЕСТКАЯ ОЧИСТКА (сбрасывает счетчики ID обратно на 1)
+  await knex.raw(
+    "TRUNCATE TABLE users, categories, products, product_sizes, product_images, carts, cart_items, orders, order_items, password_resets RESTART IDENTITY CASCADE",
+  );
 
+  // 2. Пользователи
   const adminHash = await bcrypt.hash("admin123", 10);
   const userHash = await bcrypt.hash("user123", 10);
 
@@ -32,6 +27,7 @@ exports.seed = async function (knex) {
     },
   ]);
 
+  // 3. Категории
   const categories = await knex("categories")
     .insert([
       { name: "Футболки", slug: "t-shirts" },
@@ -44,29 +40,30 @@ exports.seed = async function (knex) {
   const catId2 = categories[1].id;
   const catId3 = categories[2].id;
 
+  // 4. Товары
   const products = await knex("products")
     .insert([
       {
         name: "Футболка белая",
-        description: "Хлопок 100%",
+        description: "Хлопок 100%, базовая модель",
         price: 1500,
         category_id: catId1,
       },
       {
         name: "Футболка чёрная",
-        description: "Хлопок 100%",
-        price: 1500,
+        description: "Хлопок 100%, оверсайз",
+        price: 1700,
         category_id: catId1,
       },
       {
         name: "Джинсы синие",
-        description: "Классические",
+        description: "Классический крой, деним",
         price: 3500,
         category_id: catId2,
       },
       {
         name: "Куртка зимняя",
-        description: "Тёплая",
+        description: "Утеплитель 300г, водонепроницаемая",
         price: 7000,
         category_id: catId3,
       },
@@ -78,6 +75,7 @@ exports.seed = async function (knex) {
   const prodId3 = products[2].id;
   const prodId4 = products[3].id;
 
+  // 5. Размеры
   await knex("product_sizes").insert([
     { product_id: prodId1, size: "S", stock: 5 },
     { product_id: prodId1, size: "M", stock: 10 },
@@ -90,13 +88,21 @@ exports.seed = async function (knex) {
     { product_id: prodId4, size: "L", stock: 1 },
   ]);
 
+  // 6. Изображения (по 2 штуки на товар)
   await knex("product_images").insert([
-    { product_id: prodId1, url: "/uploads/tshirt-white-1.jpg", sort_order: 0 },
-    { product_id: prodId1, url: "/uploads/tshirt-white-2.jpg", sort_order: 1 },
-    { product_id: prodId2, url: "/uploads/tshirt-black-1.jpg", sort_order: 0 },
-    { product_id: prodId3, url: "/uploads/jeans-blue-1.jpg", sort_order: 0 },
+    // Белая футболка
+    { product_id: prodId1, url: "/uploads/white-1.jpg", sort_order: 0 },
+    { product_id: prodId1, url: "/uploads/white-2.jpg", sort_order: 1 },
+    // Черная футболка
+    { product_id: prodId2, url: "/uploads/black-1.jpg", sort_order: 0 },
+    { product_id: prodId2, url: "/uploads/black-2.jpg", sort_order: 1 },
+    // Джинсы
+    { product_id: prodId3, url: "/uploads/jeans-1.jpg", sort_order: 0 },
+    { product_id: prodId3, url: "/uploads/jeans-2.jpg", sort_order: 1 },
+    // Куртка
     { product_id: prodId4, url: "/uploads/jacket-1.jpg", sort_order: 0 },
+    { product_id: prodId4, url: "/uploads/jacket-2.jpg", sort_order: 1 },
   ]);
 
-  console.log("Тестовые данные добавлены!");
+  console.log("✅ Тестовые данные успешно добавлены! ID сброшены на 1.");
 };
