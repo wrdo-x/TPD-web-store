@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { Link } from "react-router-dom";
 import api from "../api";
 
 // Форматирование цены
@@ -16,6 +17,33 @@ function formatPrice(price) {
   }).format(value);
 }
 
+// Отображение фотографии товара
+function ProductImage({ image, name }) {
+  const [hasError, setHasError] = useState(false);
+
+  if (!image || hasError) {
+    return (
+      <div
+        className="flex h-14 w-14 shrink-0 items-center justify-center rounded-lg bg-[#f3eee7] text-xs text-[#a18b72]"
+        aria-label="Фотография отсутствует"
+      >
+        Фото
+      </div>
+    );
+  }
+
+  return (
+    <img
+      src={image}
+      alt={`Фотография товара: ${name}`}
+      loading="lazy"
+      onError={() => setHasError(true)}
+      className="h-14 w-14 shrink-0 rounded-lg border border-[#e9e5de] bg-white object-cover"
+    />
+  );
+}
+
+// Страница управления товарами
 export default function AdminProducts() {
   const [products, setProducts] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -23,7 +51,7 @@ export default function AdminProducts() {
   const [deletingId, setDeletingId] = useState(null);
   const [reloadKey, setReloadKey] = useState(0);
 
-  // Получение товаров с Backend
+  // Загрузка товаров с Backend
   useEffect(() => {
     let isMounted = true;
 
@@ -41,7 +69,7 @@ export default function AdminProducts() {
         const items = response.data?.items;
 
         if (!Array.isArray(items)) {
-          throw new Error("Некорректный формат ответа сервера");
+          throw new Error("Некорректный формат ответа сервера.");
         }
 
         setProducts(items);
@@ -90,7 +118,7 @@ export default function AdminProducts() {
 
       setProducts((currentProducts) =>
         currentProducts.filter(
-          (item) => item.id !== product.id
+          (item) => String(item.id) !== String(product.id)
         )
       );
     } catch (deleteError) {
@@ -99,7 +127,9 @@ export default function AdminProducts() {
       if (status === 401) {
         setError("Необходимо авторизоваться заново.");
       } else if (status === 403) {
-        setError("У вас недостаточно прав для удаления товаров.");
+        setError(
+          "У вас недостаточно прав для удаления товаров."
+        );
       } else {
         setError(
           deleteError.response?.data?.error ||
@@ -126,11 +156,21 @@ export default function AdminProducts() {
           </p>
         </div>
 
-        {!isLoading && (
+        {!isLoading && !error && (
           <span className="text-sm text-[#858078]">
             Всего товаров: {products.length}
           </span>
         )}
+      </div>
+
+      {/* Кнопка добавления */}
+      <div className="mb-6">
+        <Link
+          to="/admin/products/new"
+          className="inline-flex rounded-lg bg-[#292929] px-5 py-3 text-sm font-medium text-white transition hover:bg-[#45413c]"
+        >
+          + Добавить товар
+        </Link>
       </div>
 
       {/* Ошибка */}
@@ -148,9 +188,15 @@ export default function AdminProducts() {
         <div className="py-12 text-center text-sm text-[#858078]">
           Загружаем товары...
         </div>
-      ) : products.length === 0 && !error ? (
-
-        /* Пустой список */
+      ) : error && products.length === 0 ? (
+        <button
+          type="button"
+          onClick={handleRetry}
+          className="rounded-lg bg-[#292929] px-5 py-3 text-sm font-medium text-white transition hover:bg-[#45413c]"
+        >
+          Повторить загрузку
+        </button>
+      ) : products.length === 0 ? (
         <div className="py-12 text-center">
           <p className="text-lg font-medium text-[#292929]">
             Товаров пока нет
@@ -159,13 +205,19 @@ export default function AdminProducts() {
           <p className="mt-2 text-sm text-[#858078]">
             Добавленные товары появятся здесь.
           </p>
-        </div>
 
+          <Link
+            to="/admin/products/new"
+            className="mt-5 inline-flex rounded-lg bg-[#292929] px-5 py-3 text-sm font-medium text-white transition hover:bg-[#45413c]"
+          >
+            Добавить первый товар
+          </Link>
+        </div>
       ) : (
 
-        /* Таблица */
+        /* Таблица товаров */
         <div className="overflow-x-auto">
-          <table className="w-full min-w-[650px] text-left">
+          <table className="w-full min-w-[700px] text-left">
 
             <thead>
               <tr className="border-b border-[#eeeae4] text-xs uppercase tracking-wider text-[#a18b72]">
@@ -185,39 +237,37 @@ export default function AdminProducts() {
                   key={product.id}
                   className="border-b border-[#f0ede8] transition hover:bg-[#faf9f7]"
                 >
+                  {/* ID */}
                   <td className="px-4 py-4 text-sm text-[#858078]">
                     {product.id}
                   </td>
 
+                  {/* Товар */}
                   <td className="px-4 py-4">
                     <div className="flex items-center gap-3">
+                      <ProductImage
+                        key={`${product.id}-${product.image || "no-image"}`}
+                        image={product.image}
+                        name={product.name}
+                      />
 
-                      {product.image ? (
-                        <img
-                          src={product.image}
-                          alt={product.name}
-                          className="h-12 w-12 rounded-lg object-cover"
-                        />
-                      ) : (
-                        <div className="flex h-12 w-12 items-center justify-center rounded-lg bg-[#f3eee7] text-xs text-[#a18b72]">
-                          Фото
-                        </div>
-                      )}
-
-                      <span className="text-sm font-medium text-[#292929]">
+                      <span className="max-w-xs text-sm font-medium text-[#292929]">
                         {product.name}
                       </span>
                     </div>
                   </td>
 
+                  {/* Категория */}
                   <td className="px-4 py-4 text-sm text-[#625e57]">
                     {product.category_name || "Без категории"}
                   </td>
 
+                  {/* Цена */}
                   <td className="px-4 py-4 text-sm font-medium text-[#292929]">
                     {formatPrice(product.price)}
                   </td>
 
+                  {/* Действия */}
                   <td className="px-4 py-4 text-right">
                     <button
                       type="button"
@@ -240,7 +290,7 @@ export default function AdminProducts() {
       )}
 
       {/* Повторная загрузка при ошибке */}
-      {!isLoading && error && (
+      {!isLoading && products.length > 0 && error && (
         <button
           type="button"
           onClick={handleRetry}
@@ -249,6 +299,7 @@ export default function AdminProducts() {
           Повторить загрузку
         </button>
       )}
+
     </div>
   );
 }

@@ -1,4 +1,3 @@
-
 import { useMemo, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import ProductCard from "../components/ProductCard";
@@ -13,6 +12,44 @@ const categories = [
 ];
 
 const sizeOrder = ["XXS", "XS", "S", "M", "L", "XL", "XXL", "XXXL"];
+
+const PRODUCTS_PER_PAGE = 8;
+
+// Формирование номеров страниц
+function getPaginationItems(currentPage, totalPages) {
+  if (totalPages <= 7) {
+    return Array.from(
+      { length: totalPages },
+      (_, index) => index + 1
+    );
+  }
+
+  if (currentPage <= 4) {
+    return [1, 2, 3, 4, 5, "...", totalPages];
+  }
+
+  if (currentPage >= totalPages - 3) {
+    return [
+      1,
+      "...",
+      totalPages - 4,
+      totalPages - 3,
+      totalPages - 2,
+      totalPages - 1,
+      totalPages,
+    ];
+  }
+
+  return [
+    1,
+    "...",
+    currentPage - 1,
+    currentPage,
+    currentPage + 1,
+    "...",
+    totalPages,
+  ];
+}
 
 export default function Catalog() {
   const [search, setSearch] = useState("");
@@ -53,6 +90,14 @@ export default function Catalog() {
     ? requestedSize
     : "";
 
+  // Текущая страница
+  const requestedPage = Number(searchParams.get("page") || 1);
+
+  const validRequestedPage =
+    Number.isInteger(requestedPage) && requestedPage > 0
+      ? requestedPage
+      : 1;
+
   // Изменение категории
   const handleCategoryChange = (value) => {
     const nextParams = new URLSearchParams(searchParams);
@@ -62,6 +107,8 @@ export default function Catalog() {
     } else {
       nextParams.set("category", value);
     }
+
+    nextParams.delete("page");
 
     setSearchParams(nextParams);
   };
@@ -76,7 +123,33 @@ export default function Catalog() {
       nextParams.set("size", value);
     }
 
+    nextParams.delete("page");
+
     setSearchParams(nextParams);
+  };
+
+  // Сброс страницы при поиске
+  const handleSearchChange = (value) => {
+    setSearch(value);
+
+    if (searchParams.has("page")) {
+      const nextParams = new URLSearchParams(searchParams);
+      nextParams.delete("page");
+
+      setSearchParams(nextParams, { replace: true });
+    }
+  };
+
+  // Изменение сортировки
+  const handleSortChange = (value) => {
+    setSort(value);
+
+    if (searchParams.has("page")) {
+      const nextParams = new URLSearchParams(searchParams);
+      nextParams.delete("page");
+
+      setSearchParams(nextParams, { replace: true });
+    }
   };
 
   // Сброс всех фильтров
@@ -116,11 +189,49 @@ export default function Catalog() {
     return result;
   }, [search, category, selectedSize, sort]);
 
+  // Расчёт пагинации
+  const totalPages = Math.max(
+    1,
+    Math.ceil(filteredProducts.length / PRODUCTS_PER_PAGE)
+  );
+
+  const currentPage = Math.min(validRequestedPage, totalPages);
+
+  // Товары текущей страницы
+  const paginatedProducts = useMemo(() => {
+    const startIndex = (currentPage - 1) * PRODUCTS_PER_PAGE;
+
+    return filteredProducts.slice(
+      startIndex,
+      startIndex + PRODUCTS_PER_PAGE
+    );
+  }, [filteredProducts, currentPage]);
+
+  // Переключение страницы
+  const handlePageChange = (page) => {
+    if (page < 1 || page > totalPages) return;
+
+    const nextParams = new URLSearchParams(searchParams);
+
+    if (page === 1) {
+      nextParams.delete("page");
+    } else {
+      nextParams.set("page", String(page));
+    }
+
+    setSearchParams(nextParams);
+  };
+
   const hasActiveFilters =
     search.trim() !== "" ||
     category !== "Все" ||
     selectedSize !== "" ||
     sort !== "default";
+
+  const paginationItems = getPaginationItems(
+    currentPage,
+    totalPages
+  );
 
   return (
     <main className="min-h-screen bg-[#f8f7f4]">
@@ -147,7 +258,7 @@ export default function Catalog() {
           <input
             type="search"
             value={search}
-            onChange={(e) => setSearch(e.target.value)}
+            onChange={(e) => handleSearchChange(e.target.value)}
             placeholder="Поиск товаров..."
             aria-label="Поиск товаров"
             className="w-full rounded-lg border border-gray-200 bg-white px-4 py-3 text-sm outline-none transition focus:border-[#a18b72] sm:max-w-md"
@@ -155,7 +266,7 @@ export default function Catalog() {
 
           <select
             value={sort}
-            onChange={(e) => setSort(e.target.value)}
+            onChange={(e) => handleSortChange(e.target.value)}
             aria-label="Сортировка товаров"
             className="rounded-lg border border-gray-200 bg-white px-4 py-3 text-sm outline-none focus:border-[#a18b72]"
           >
@@ -166,29 +277,27 @@ export default function Catalog() {
 
         </div>
 
-        {/* Фильтр категорий */}
-        <div className="mb-8">
-          <h2 className="mb-4 text-sm font-semibold text-[#292929]">
+        {/* Выпадающий список категорий */}
+        <div className="mb-8 max-w-sm">
+          <label
+            htmlFor="catalog-category"
+            className="mb-3 block text-sm font-semibold text-[#292929]"
+          >
             Категория
-          </h2>
+          </label>
 
-          <div className="flex flex-wrap gap-3">
+          <select
+            id="catalog-category"
+            value={category}
+            onChange={(e) => handleCategoryChange(e.target.value)}
+            className="w-full rounded-lg border border-gray-200 bg-white px-4 py-3 text-sm text-[#292929] outline-none transition focus:border-[#a18b72] focus:ring-2 focus:ring-[#a18b72]/10"
+          >
             {categories.map((item) => (
-              <button
-                key={item}
-                type="button"
-                onClick={() => handleCategoryChange(item)}
-                aria-pressed={category === item}
-                className={`rounded-full border px-5 py-2.5 text-sm transition ${
-                  category === item
-                    ? "border-[#292929] bg-[#292929] text-white"
-                    : "border-gray-300 bg-white text-gray-600 hover:border-[#292929]"
-                }`}
-              >
+              <option key={item} value={item}>
                 {item}
-              </button>
+              </option>
             ))}
-          </div>
+          </select>
         </div>
 
         {/* Фильтр размеров */}
@@ -249,9 +358,9 @@ export default function Catalog() {
         </div>
 
         {/* Товары */}
-        {filteredProducts.length > 0 ? (
+        {paginatedProducts.length > 0 ? (
           <div className="grid grid-cols-2 gap-4 sm:grid-cols-2 md:gap-6 lg:grid-cols-4">
-            {filteredProducts.map((product) => (
+            {paginatedProducts.map((product) => (
               <ProductCard
                 key={product.id}
                 product={product}
@@ -276,6 +385,59 @@ export default function Catalog() {
               Сбросить фильтры
             </button>
           </div>
+        )}
+
+        {/* Пагинация */}
+        {totalPages > 1 && (
+          <nav
+            aria-label="Пагинация каталога"
+            className="mt-12 flex flex-wrap items-center justify-center gap-2"
+          >
+            <button
+              type="button"
+              onClick={() => handlePageChange(currentPage - 1)}
+              disabled={currentPage === 1}
+              className="rounded-lg border border-gray-200 bg-white px-4 py-2.5 text-sm text-[#625e57] transition hover:border-[#292929] disabled:cursor-not-allowed disabled:opacity-40"
+            >
+              Назад
+            </button>
+
+            {paginationItems.map((item, index) =>
+              item === "..." ? (
+                <span
+                  key={`ellipsis-${index}`}
+                  className="px-2 text-gray-400"
+                >
+                  ...
+                </span>
+              ) : (
+                <button
+                  key={item}
+                  type="button"
+                  onClick={() => handlePageChange(item)}
+                  aria-current={
+                    currentPage === item ? "page" : undefined
+                  }
+                  className={`h-10 min-w-10 rounded-lg border px-3 text-sm transition ${
+                    currentPage === item
+                      ? "border-[#292929] bg-[#292929] text-white"
+                      : "border-gray-200 bg-white text-[#625e57] hover:border-[#292929]"
+                  }`}
+                >
+                  {item}
+                </button>
+              )
+            )}
+
+            <button
+              type="button"
+              onClick={() => handlePageChange(currentPage + 1)}
+              disabled={currentPage === totalPages}
+              className="rounded-lg border border-gray-200 bg-white px-4 py-2.5 text-sm text-[#625e57] transition hover:border-[#292929] disabled:cursor-not-allowed disabled:opacity-40"
+            >
+              Вперёд
+            </button>
+          </nav>
         )}
 
       </div>

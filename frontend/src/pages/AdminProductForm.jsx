@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import api from "../api";
 
@@ -9,9 +9,13 @@ const initialForm = {
   category_id: "",
 };
 
-export default function AdminProductForm() {
-  const [form, setForm] = useState(initialForm);
+const productsUrl = "/admin/products";
 
+// Форма добавления товара
+export default function AdminProductForm() {
+  const fileInputRef = useRef(null);
+
+  const [form, setForm] = useState(initialForm);
   const [categories, setCategories] = useState([]);
   const [isLoadingCategories, setIsLoadingCategories] = useState(true);
   const [categoriesError, setCategoriesError] = useState("");
@@ -20,9 +24,13 @@ export default function AdminProductForm() {
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
 
-  // Получаем категории из списка товаров
+  const [imagePreview, setImagePreview] = useState("");
+  const [imageName, setImageName] = useState("");
+  const [imageFile, setImageFile] = useState(null);
+
+  // Загрузка категорий с Backend
   useEffect(() => {
-    let isMounted = true;
+    const controller = new AbortController();
 
     const loadCategories = async () => {
       try {
@@ -31,17 +39,18 @@ export default function AdminProductForm() {
             page: 1,
             limit: 100,
           },
+          signal: controller.signal,
         });
 
-        if (!isMounted) return;
+        if (controller.signal.aborted) return;
 
         const items = response.data?.items;
 
         if (!Array.isArray(items)) {
-          throw new Error("Некорректный ответ сервера");
+          throw new Error("Некорректный ответ сервера.");
         }
 
-        // Формируем список уникальных категорий
+        // Получаем категории из существующих товаров
         const categoryMap = new Map();
 
         items.forEach((product) => {
@@ -70,18 +79,19 @@ export default function AdminProductForm() {
           }));
         } else {
           setCategoriesError(
-            "Не удалось определить категории. В каталоге пока нет товаров."
+            "Категории не найдены. Для добавления товара необходимо наличие категорий в базе данных."
           );
         }
       } catch (requestError) {
-        if (!isMounted) return;
+        if (controller.signal.aborted) return;
 
         setCategoriesError(
           requestError.response?.data?.error ||
+            requestError.message ||
             "Не удалось загрузить категории. Проверьте подключение к серверу."
         );
       } finally {
-        if (isMounted) {
+        if (!controller.signal.aborted) {
           setIsLoadingCategories(false);
         }
       }
@@ -90,7 +100,7 @@ export default function AdminProductForm() {
     loadCategories();
 
     return () => {
-      isMounted = false;
+      controller.abort();
     };
   }, []);
 
@@ -105,6 +115,73 @@ export default function AdminProductForm() {
 
     setError("");
     setSuccess("");
+  };
+
+  // Выбор фотографии
+  const handleImageChange = (event) => {
+    const file = event.target.files?.[0];
+
+    if (!file) return;
+
+    setError("");
+    setSuccess("");
+
+    const allowedTypes = [
+      "image/jpeg",
+      "image/png",
+      "image/webp",
+    ];
+
+    if (!allowedTypes.includes(file.type)) {
+      setError(
+        "Выберите изображение в формате JPG, PNG или WEBP."
+      );
+      event.target.value = "";
+      return;
+    }
+
+    const maxSize = 1024 * 1024;
+
+    if (file.size > maxSize) {
+      setError(
+        "Размер фотографии не должен превышать 1 МБ."
+      );
+      event.target.value = "";
+      return;
+    }
+
+    const reader = new FileReader();
+
+    reader.onload = () => {
+      if (typeof reader.result === "string") {
+        setImageFile(file);
+        setImagePreview(reader.result);
+        setImageName(file.name);
+      } else {
+        setImageFile(null);
+        setImagePreview("");
+        setError("Не удалось прочитать фотографию.");
+      }
+    };
+
+    reader.onerror = () => {
+      setImageFile(null);
+      setImagePreview("");
+      setError("Ошибка при загрузке фотографии.");
+    };
+
+    reader.readAsDataURL(file);
+  };
+
+  // Удаление выбранной фотографии
+  const handleRemoveImage = () => {
+    setImagePreview("");
+    setImageName("");
+    setImageFile(null);
+
+    if (fileInputRef.current) {
+      fileInputRef.current.value = "";
+    }
   };
 
   // Отправка формы
@@ -131,22 +208,36 @@ export default function AdminProductForm() {
       return;
     }
 
+    const productData = {
+      name: form.name.trim(),
+      description: form.description.trim(),
+      price,
+      category_id: Number(form.category_id),
+    };
+
+    const hasImage = Boolean(imageFile);
+
     setIsSubmitting(true);
 
     try {
-      await api.post("/products", {
-        name: form.name.trim(),
-        description: form.description.trim(),
-        price,
-        category_id: Number(form.category_id),
-      });
+      // Отправляем данные товара на Backend
+      await api.post("/products", productData);
 
-      setSuccess("Товар успешно добавлен!");
+      if (hasImage) {
+        setSuccess(
+          "Товар успешно добавлен! Фотография пока не сохранена на сервере, поскольку загрузка изображений ещё не реализована на Backend."
+        );
+      } else {
+        setSuccess("Товар успешно добавлен!");
+      }
 
+      // Очищаем форму
       setForm((current) => ({
         ...initialForm,
         category_id: current.category_id,
       }));
+
+      handleRemoveImage();
     } catch (requestError) {
       const status = requestError.response?.status;
 
@@ -173,7 +264,7 @@ export default function AdminProductForm() {
       {/* Заголовок */}
       <div className="mb-8">
         <Link
-          to="/admin/products"
+          to={productsUrl}
           className="text-sm text-[#8f795f] transition hover:text-[#292929]"
         >
           ← Вернуться к товарам
@@ -188,7 +279,13 @@ export default function AdminProductForm() {
         </p>
       </div>
 
-      {/* Уведомления */}
+      {/* Информация о фотографиях */}
+      <div className="mb-6 rounded-lg border border-blue-200 bg-blue-50 p-4 text-sm text-blue-800">
+        Фотографию можно выбрать и посмотреть перед добавлением.
+        Сохранение изображения на сервер пока не подключено.
+      </div>
+
+      {/* Ошибка */}
       {error && (
         <div
           role="alert"
@@ -198,12 +295,22 @@ export default function AdminProductForm() {
         </div>
       )}
 
+      {/* Успешное добавление */}
       {success && (
         <div
           role="status"
           className="mb-6 rounded-lg border border-green-200 bg-green-50 p-4 text-sm text-green-700"
         >
           {success}
+
+          <p className="mt-3">
+            <Link
+              to={productsUrl}
+              className="font-medium underline"
+            >
+              Посмотреть список товаров
+            </Link>
+          </p>
         </div>
       )}
 
@@ -252,6 +359,75 @@ export default function AdminProductForm() {
           />
         </div>
 
+        {/* Фотография */}
+        <div>
+          <label
+            htmlFor="product-image"
+            className="mb-2 block text-sm font-medium text-[#292929]"
+          >
+            Фотография товара
+          </label>
+
+          <div className="rounded-xl border border-dashed border-[#cfc5b8] bg-[#faf9f7] p-5">
+
+            {imagePreview ? (
+              <div className="flex flex-col items-start gap-4 sm:flex-row sm:items-center">
+
+                <img
+                  src={imagePreview}
+                  alt="Предпросмотр товара"
+                  className="h-40 w-40 rounded-lg border border-[#e9e5de] bg-white object-cover"
+                />
+
+                <div>
+                  <p className="max-w-xs break-all text-sm font-medium text-[#292929]">
+                    {imageName}
+                  </p>
+
+                  <p className="mt-1 text-xs text-[#858078]">
+                    Фотография выбрана
+                  </p>
+
+                  <button
+                    type="button"
+                    onClick={handleRemoveImage}
+                    className="mt-4 rounded-lg border border-red-200 px-4 py-2 text-sm text-red-600 transition hover:bg-red-50"
+                  >
+                    Удалить фотографию
+                  </button>
+                </div>
+
+              </div>
+            ) : (
+              <div className="flex flex-col items-center py-5 text-center">
+
+                <div className="mb-3 flex h-14 w-14 items-center justify-center rounded-full bg-[#f0eae1] text-2xl text-[#8f795f]">
+                  +
+                </div>
+
+                <p className="text-sm font-medium text-[#292929]">
+                  Добавьте фотографию товара
+                </p>
+
+                <p className="mt-2 text-xs text-[#858078]">
+                  JPG, PNG или WEBP. Максимальный размер — 1 МБ.
+                </p>
+
+              </div>
+            )}
+
+            <input
+              ref={fileInputRef}
+              id="product-image"
+              type="file"
+              accept="image/jpeg,image/png,image/webp"
+              onChange={handleImageChange}
+              className="mt-4 block w-full text-sm text-[#625e57] file:mr-4 file:rounded-lg file:border-0 file:bg-[#292929] file:px-4 file:py-2.5 file:text-sm file:font-medium file:text-white hover:file:bg-[#45413c]"
+            />
+
+          </div>
+        </div>
+
         {/* Цена */}
         <div>
           <label
@@ -289,10 +465,7 @@ export default function AdminProductForm() {
               Загружаем категории...
             </p>
           ) : categoriesError ? (
-            <p
-              role="alert"
-              className="text-sm text-red-600"
-            >
+            <p role="alert" className="text-sm text-red-600">
               {categoriesError}
             </p>
           ) : (
@@ -309,7 +482,10 @@ export default function AdminProductForm() {
               </option>
 
               {categories.map((category) => (
-                <option key={category.id} value={category.id}>
+                <option
+                  key={category.id}
+                  value={category.id}
+                >
                   {category.name}
                 </option>
               ))}
@@ -335,7 +511,7 @@ export default function AdminProductForm() {
           </button>
 
           <Link
-            to="/admin/products"
+            to={productsUrl}
             className="rounded-lg border border-[#e5e0d8] px-6 py-3 text-center text-sm font-medium text-[#625e57] transition hover:bg-[#f8f7f4]"
           >
             Отмена

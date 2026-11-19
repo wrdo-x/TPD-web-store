@@ -1,5 +1,10 @@
 import { useEffect, useState } from "react";
-import { Link, useLocation, useNavigate } from "react-router-dom";
+import {
+  Link,
+  useLocation,
+  useNavigate,
+} from "react-router-dom";
+
 import api from "../api";
 import AdminProducts from "./AdminProducts";
 import AdminProductForm from "./AdminProductForm";
@@ -91,7 +96,7 @@ function AdminActionCard({
   );
 }
 
-// Главная страница администратора
+// Панель администратора
 export default function AdminPanel() {
   const { pathname } = useLocation();
   const navigate = useNavigate();
@@ -125,6 +130,7 @@ export default function AdminPanel() {
 
         setAdmin(response.data);
         setStatus("ready");
+        setError("");
       } catch (requestError) {
         if (!isMounted) return;
 
@@ -195,12 +201,11 @@ export default function AdminPanel() {
     );
   }
 
-  // Основная страница панели
   return (
     <main className="min-h-screen bg-[#f8f7f4]">
       <div className="mx-auto max-w-7xl px-5 py-10 md:px-8 md:py-12">
 
-        {/* Заголовок панели */}
+        {/* Заголовок */}
         <header className="mb-9">
           <p className="mb-3 text-xs font-medium uppercase tracking-[0.2em] text-[#a18b72]">
             Администрирование
@@ -231,26 +236,23 @@ export default function AdminPanel() {
 
           <AdminNavigation />
 
-          <section aria-labelledby="admin-content-title">
+          <section aria-label="Содержимое панели администратора">
 
-            {/* Раздел товаров */}
+            {/* Список товаров */}
             {pathname === "/admin/products" ? (
               <AdminProducts />
 
             ) : pathname === "/admin/products/new" ? (
 
-              /* Форма добавления товара */
+              /* Добавление товара */
               <AdminProductForm />
 
             ) : (
 
-              /* Главная страница панели */
+              /* Главная страница */
               <>
                 <div className="mb-6 rounded-xl border border-[#e9e5de] bg-white p-6 shadow-sm sm:p-8">
-                  <h2
-                    id="admin-content-title"
-                    className="text-xl font-semibold text-[#292929]"
-                  >
+                  <h2 className="text-xl font-semibold text-[#292929]">
                     Добро пожаловать в панель управления
                   </h2>
 
