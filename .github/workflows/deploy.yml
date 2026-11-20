@@ -13,7 +13,6 @@ permissions:
   id-token: write
 
 jobs:
-  # 1. CI Бэкенда (просто установка зависимостей)
   backend-ci:
     runs-on: ubuntu-latest
     defaults:
@@ -28,9 +27,6 @@ jobs:
           cache-dependency-path: "./backend/package-lock.json"
       - run: npm ci
 
-  # 2. CD Бэкенда: Сборка Docker-образа и пуш в GitHub Registry
-  # Это докажет, что ты умеешь готовить артефакт для деплоя
-  # --- ДЖОБ 2: CD для Бэкенда (сборка и пуш Docker-образа) ---
   backend-docker:
     needs: backend-ci
     if: github.ref == 'refs/heads/main' && github.event_name == 'push'
@@ -55,10 +51,8 @@ jobs:
         with:
           context: ./backend
           push: true
-          # Используем переменную, которую мы создали шагом выше
           tags: ghcr.io/${{ env.REPO_LOWER }}/backend:latest
 
-  # 3. CI/CD Фронтенда: Сборка и деплой на GitHub Pages
   frontend-deploy:
     runs-on: ubuntu-latest
     defaults:

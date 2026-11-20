@@ -99,8 +99,11 @@ exports.createProduct = async (req, res) => {
   try {
     const { name, description, price, category_id } = req.body;
 
+    // Проверка на наличие файлов (req.files - это массив, если используется .array())
     if (!name || !price || !category_id) {
-      if (req.file) fs.unlink(req.file.path, () => {});
+      if (req.files && req.files.length > 0) {
+        req.files.forEach((file) => fs.unlink(file.path, () => {}));
+      }
       return res
         .status(400)
         .json({ error: "Название, цена и категория обязательны" });
@@ -115,20 +118,28 @@ exports.createProduct = async (req, res) => {
       })
       .returning("*");
 
-    if (req.file) {
-      const imageUrl = `/uploads/products/${req.file.filename}`;
-      await db("product_images").insert({
+    // Сохраняем изображения
+    if (req.files && req.files.length > 0) {
+      const imagesToInsert = req.files.map((file, index) => ({
         product_id: newProduct.id,
-        url: imageUrl,
-        sort_order: 0,
-      });
-      newProduct.image = getFullImageUrl(req, imageUrl);
+        url: `/uploads/products/${file.filename}`,
+        sort_order: index,
+      }));
+
+      await db("product_images").insert(imagesToInsert);
+
+      newProduct.image = getFullImageUrl(req, imagesToInsert[0].url);
+      newProduct.images = imagesToInsert.map((img) =>
+        getFullImageUrl(req, img.url),
+      );
     }
 
     res.status(201).json(newProduct);
   } catch (err) {
     console.error(err);
-    if (req.file) fs.unlink(req.file.path, () => {});
+    if (req.files && req.files.length > 0) {
+      req.files.forEach((file) => fs.unlink(file.path, () => {}));
+    }
     res.status(500).json({ error: "Ошибка при создании товара" });
   }
 };

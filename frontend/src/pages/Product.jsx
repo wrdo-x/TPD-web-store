@@ -8,16 +8,27 @@ export default function Product() {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState("");
 
+  // Состояние для галереи
+  const [activeImage, setActiveImage] = useState("");
+  // Состояние для отслеживания ошибки загрузки картинки
+  const [imageError, setImageError] = useState(false);
+
   const [selectedSize, setSelectedSize] = useState("");
   const [message, setMessage] = useState("");
 
-  // Загрузка товара с бэкенда
   useEffect(() => {
     const fetchProduct = async () => {
       try {
         setIsLoading(true);
         const response = await api.get(`/products/${id}`);
         setProduct(response.data);
+
+        if (response.data.images && response.data.images.length > 0) {
+          setActiveImage(response.data.images[0]);
+        } else if (response.data.image) {
+          setActiveImage(response.data.image);
+        }
+
         setError("");
       } catch (err) {
         if (err.response?.status === 404) {
@@ -31,6 +42,11 @@ export default function Product() {
     };
     fetchProduct();
   }, [id]);
+
+  // Сбрасываем ошибку при смене картинки в галерее
+  useEffect(() => {
+    setImageError(false);
+  }, [activeImage]);
 
   if (isLoading) {
     return (
@@ -83,7 +99,7 @@ export default function Product() {
         productId: product.id,
         name: product.name,
         price: product.price,
-        image: product.image, // Сохраняем картинку в корзину
+        image: activeImage || product.image,
         size: selectedSize,
         quantity: 1,
       });
@@ -93,8 +109,17 @@ export default function Product() {
     setMessage("Товар добавлен в корзину!");
   };
 
-  // Товар считается в наличии, если у него есть хотя бы один размер
   const inStock = Array.isArray(product.sizes) && product.sizes.length > 0;
+
+  const galleryImages =
+    product.images && product.images.length > 0
+      ? product.images
+      : product.image
+        ? [product.image]
+        : [];
+
+  // Проверяем, нужно ли показывать картинку или плейсхолдер
+  const showImage = activeImage && !imageError;
 
   return (
     <main className="min-h-screen bg-[#f8f7f4]">
@@ -112,24 +137,55 @@ export default function Product() {
         </div>
 
         <div className="grid grid-cols-1 gap-10 md:grid-cols-2 md:gap-16">
-          <div className="aspect-[4/5] overflow-hidden rounded-xl bg-[#e9e4dc]">
-            {product.image ? (
-              <img
-                src={product.image}
-                alt={product.name}
-                className="h-full w-full object-cover"
-              />
-            ) : (
-              <div className="flex h-full flex-col items-center justify-center">
-                <span className="text-7xl font-light text-[#a99a87]">
-                  {String(product.id).padStart(2, "0")}
-                </span>
-                <span className="mt-4 text-xs uppercase tracking-widest text-[#898174]">
-                  Фото товара
-                </span>
+          {/* БЛОК ГАЛЕРЕИ */}
+          <div className="flex flex-col gap-4">
+            <div className="aspect-[4/5] overflow-hidden rounded-xl bg-[#e9e4dc]">
+              {showImage ? (
+                <img
+                  src={activeImage}
+                  alt={product.name}
+                  // Если картинка не загрузится, сработает эта функция
+                  onError={() => setImageError(true)}
+                  className="h-full w-full object-cover transition-opacity duration-300"
+                />
+              ) : (
+                // Плейсхолдер
+                <div className="flex h-full flex-col items-center justify-center">
+                  <span className="text-7xl font-light text-[#a99a87]">
+                    {String(product.id).padStart(2, "0")}
+                  </span>
+                  <span className="mt-4 text-xs uppercase tracking-widest text-[#898174]">
+                    Фото товара
+                  </span>
+                </div>
+              )}
+            </div>
+
+            {/* Миниатюры */}
+            {galleryImages.length > 1 && (
+              <div className="flex flex-wrap gap-3">
+                {galleryImages.map((img, index) => (
+                  <button
+                    key={index}
+                    type="button"
+                    onClick={() => setActiveImage(img)}
+                    className={`h-20 w-16 overflow-hidden rounded-lg border-2 transition-all ${
+                      activeImage === img
+                        ? "border-[#292929]"
+                        : "border-transparent opacity-70 hover:opacity-100"
+                    }`}
+                  >
+                    <img
+                      src={img}
+                      alt={`${product.name} - фото ${index + 1}`}
+                      className="h-full w-full object-cover"
+                    />
+                  </button>
+                ))}
               </div>
             )}
           </div>
+          {/* КОНЕЦ БЛОКА ГАЛЕРЕИ */}
 
           <div className="flex flex-col justify-center py-4">
             <span className="text-xs uppercase tracking-widest text-[#a18b72]">

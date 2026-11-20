@@ -12,7 +12,7 @@ router.post(
   "/",
   authMiddleware,
   adminMiddleware,
-  upload.single("image"),
+  upload.array("images", 5),
   productController.createProduct,
 );
 
